@@ -122,11 +122,12 @@ header {
 
 /* Sections */
 section {
-    padding: 60px 10% 100px; /* 위쪽 공백은 줄이고 아래쪽 여백은 충분히 유지 */
-    scroll-margin-top: 80px; /* 고정 헤더 높이만큼 스크롤 위치 보정 */
-    min-height: auto;
+    padding: 80px 10%; 
+    min-height: 100vh; /* 각 섹션이 화면 하나를 꽉 채우도록 설정 */
     display: flex;
     flex-direction: column;
+    justify-content: center; /* 내용 중앙 정렬 */
+    scroll-margin-top: 80px;
 }
 
 /* Alternate Background Colors for better readability */
@@ -214,13 +215,13 @@ section:nth-of-type(odd) {
 }
 
 .hero-title {
-    font-size: clamp(2.5rem, 8vw, 5.5rem); /* 유동적인 폰트 크기 적용 */
+    font-size: clamp(2rem, 5.5vw, 4rem); /* 크기를 약간 줄임 */
     line-height: 1.2;
     font-weight: 800;
-    margin-bottom: 3.5rem;
+    margin-bottom: 2rem; /* 아래 간격 줄임 */
     letter-spacing: -1.5px;
     text-shadow: 0 10px 30px rgba(0,0,0,0.3);
-    word-break: keep-all; /* 한글 단어가 중간에 잘리지 않도록 설정 */
+    word-break: keep-all;
     overflow-wrap: break-word;
 }
 
@@ -236,7 +237,7 @@ section:nth-of-type(odd) {
 .hero-info-card {
     border-left: 4px solid var(--accent-blue);
     padding: 20px 30px;
-    margin: 0 auto 3.5rem;
+    margin: 0 auto 2rem; /* 버튼을 위로 올리기 위해 마진 축소 */
     background: rgba(255, 255, 255, 0.05);
     backdrop-filter: blur(10px);
     border-radius: 4px;
