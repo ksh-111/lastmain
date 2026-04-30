@@ -80,6 +80,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const boardCancelBtn = document.getElementById('boardCancelBtn');
 
         // [실시간 데이터 불러오기]
+        let openedPostId = null; // 현재 열려있는 게시글 ID 추적용
+
         const q = query(postsCol, orderBy("createdAt", "desc"));
         onSnapshot(q, (snapshot) => {
             posts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -120,19 +122,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
         window.togglePostContent = async (index) => {
             const post = posts[index];
-            const wrapper = document.getElementById(`postBodyWrapper-${index}`);
-            if(wrapper) {
-                if (wrapper.style.display === 'none') {
-                    wrapper.style.display = 'block';
-                    // 조회수 업데이트
-                    const docRef = doc(window.db, "posts", post.id);
-                    await updateDoc(docRef, {
-                        views: (post.views || 0) + 1
-                    });
-                } else {
-                    wrapper.style.display = 'none';
-                }
+            if (openedPostId === post.id) {
+                openedPostId = null;
+            } else {
+                openedPostId = post.id;
+                // 조회수 업데이트
+                const docRef = doc(window.db, "posts", post.id);
+                await updateDoc(docRef, {
+                    views: (post.views || 0) + 1
+                });
             }
+            renderPosts();
         };
 
         window.unlockSecretPost = (index) => {
@@ -244,6 +244,7 @@ document.addEventListener('DOMContentLoaded', () => {
                  const postNum = posts.length - postIndex;
                  const viewsCount = post.views || 0;
                  const likesCount = post.likes || 0;
+                 const isOpened = openedPostId === post.id;
                  
                  postEl.innerHTML = `
                       <div class="list-item-header" onclick="togglePostContent(${postIndex})">
@@ -258,7 +259,7 @@ document.addEventListener('DOMContentLoaded', () => {
                           <div id="postLikes-${postIndex}" style="width: 70px; flex-shrink: 0; text-align: center; color: #888; font-size: 0.95rem;">${likesCount}</div>
                       </div>
                       
-                      <div id="postBodyWrapper-${postIndex}" style="display: none; padding: 25px; background: #fdfdfd; border-bottom: 2px solid #eaeaea;">
+                      <div id="postBodyWrapper-${postIndex}" style="display: ${isOpened ? 'block' : 'none'}; padding: 25px; background: #fdfdfd; border-bottom: 2px solid #eaeaea;">
                           <div id="lockNotice-${postIndex}" style="${isLocked ? 'display: flex;' : 'display: none;'} flex-direction:column; align-items: center; justify-content: center; gap: 10px; cursor: pointer; padding: 40px 0; background: #f0f0f0; border-radius: 6px;" onclick="unlockSecretPost(${postIndex})">
                               <span style="font-size:2rem;">🔒</span> 
                               <span style="color:#555; font-size:0.95rem;">비밀글입니다. (클릭하여 비밀번호 입력)</span>
