@@ -122,8 +122,9 @@ header {
 
 /* Sections */
 section {
-    padding: 120px 10%; /* 위아래 간격 대폭 확대 */
-    min-height: auto; /* 고정 높이 대신 내용에 맞게 조정 */
+    padding: 60px 10% 100px; /* 위쪽 공백은 줄이고 아래쪽 여백은 충분히 유지 */
+    scroll-margin-top: 80px; /* 고정 헤더 높이만큼 스크롤 위치 보정 */
+    min-height: auto;
     display: flex;
     flex-direction: column;
 }
