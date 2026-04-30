@@ -1,3 +1,15 @@
+import { 
+    collection, 
+    addDoc, 
+    onSnapshot, 
+    query, 
+    orderBy, 
+    serverTimestamp,
+    deleteDoc,
+    doc,
+    updateDoc
+} from "https://www.gstatic.com/firebasejs/10.10.0/firebase-firestore.js";
+
 document.addEventListener('DOMContentLoaded', () => {
     // Scroll Reveal Animation
     const observerOptions = {
@@ -40,41 +52,43 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // --- Free Board Logic (LocalStorage) ---
+    // --- Free Board Logic (Firestore 실시간 연동) ---
     const boardForm = document.getElementById('boardForm');
     const boardList = document.getElementById('boardList');
     const adminBtn = document.getElementById('adminBtn');
     
     let isAdmin = sessionStorage.getItem('isAdmin') === 'true';
 
+    // Firestore 컬렉션 참조
+    const postsCol = collection(window.db, "posts");
+
     if (adminBtn) {
         adminBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            if (isAdmin) {
-                isAdmin = false;
-                sessionStorage.setItem('isAdmin', 'false');
-                alert('관리자 모드가 해제되었습니다.');
-                location.reload();
-            } else {
-                isAdmin = true;
-                sessionStorage.setItem('isAdmin', 'true');
-                alert('관리자 모드로 접속했습니다.');
-                location.reload();
-            }
+            isAdmin = !isAdmin;
+            sessionStorage.setItem('isAdmin', isAdmin);
+            alert(isAdmin ? '관리자 모드로 접속했습니다.' : '관리자 모드가 해제되었습니다.');
+            location.reload();
         });
     }
 
     if (boardForm && boardList) {
-        let posts = JSON.parse(localStorage.getItem('freeBoardPosts')) || [];
-        let currentEditIndex = -1;
+        let posts = []; // Firestore에서 데이터를 실시간으로 채울 예정
+        let currentEditId = null;
         const boardSubmitBtn = document.getElementById('boardSubmitBtn');
-
         const showFormBtn = document.getElementById('showFormBtn');
         const boardCancelBtn = document.getElementById('boardCancelBtn');
 
+        // [실시간 데이터 불러오기]
+        const q = query(postsCol, orderBy("createdAt", "desc"));
+        onSnapshot(q, (snapshot) => {
+            posts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            renderPosts();
+        });
+
         if (showFormBtn) {
             showFormBtn.addEventListener('click', () => {
-                currentEditIndex = -1;
+                currentEditId = null;
                 boardForm.reset();
                 if (boardSubmitBtn) boardSubmitBtn.innerText = "게시글 등록하기";
                 const pwField = document.getElementById('boardSecretPw');
@@ -90,7 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
             boardCancelBtn.addEventListener('click', () => {
                 boardForm.style.display = 'none';
                 if (showFormBtn) showFormBtn.style.display = 'inline-block';
-                currentEditIndex = -1;
+                currentEditId = null;
             });
         }
 
@@ -104,16 +118,17 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        window.togglePostContent = (index) => {
+        window.togglePostContent = async (index) => {
+            const post = posts[index];
             const wrapper = document.getElementById(`postBodyWrapper-${index}`);
             if(wrapper) {
                 if (wrapper.style.display === 'none') {
                     wrapper.style.display = 'block';
-                    if (posts[index].views === undefined) posts[index].views = 0;
-                    posts[index].views++;
-                    savePosts();
-                    const viewsEl = document.getElementById(`postViews-${index}`);
-                    if(viewsEl) viewsEl.innerText = posts[index].views;
+                    // 조회수 업데이트
+                    const docRef = doc(window.db, "posts", post.id);
+                    await updateDoc(docRef, {
+                        views: (post.views || 0) + 1
+                    });
                 } else {
                     wrapper.style.display = 'none';
                 }
@@ -123,13 +138,8 @@ document.addEventListener('DOMContentLoaded', () => {
         window.unlockSecretPost = (index) => {
             let pw = prompt('비밀번호를 입력하세요:');
             if (pw === posts[index].secretPw) {
-                const titleSpan = document.getElementById(`postTitle-${index}`);
-                if(titleSpan) {
-                    titleSpan.innerHTML = posts[index].title || "제목 없음";
-                }
-                const titleLock = document.getElementById(`postLockIcon-${index}`);
-                if(titleLock) titleLock.style.display = 'none';
-
+                document.getElementById(`postTitle-${index}`).innerHTML = posts[index].title || "제목 없음";
+                document.getElementById(`postLockIcon-${index}`).style.display = 'none';
                 document.getElementById(`lockNotice-${index}`).style.display = 'none';
                 document.getElementById(`postBody-${index}`).style.display = 'block';
             } else if (pw !== null) {
@@ -137,39 +147,32 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
-        const savePosts = () => {
-            localStorage.setItem('freeBoardPosts', JSON.stringify(posts));
+        window.likePost = async (pIndex) => {
+            const post = posts[pIndex];
+            const docRef = doc(window.db, "posts", post.id);
+            await updateDoc(docRef, {
+                likes: (post.likes || 0) + 1
+            });
         };
 
-        window.likePost = (pIndex) => {
-            if (!posts[pIndex].likes) posts[pIndex].likes = 0;
-            posts[pIndex].likes++;
-            savePosts();
-            renderPosts();
-        };
-
-        window.deletePost = (pIndex) => {
+        window.deletePost = async (pIndex) => {
             if (!isAdmin) return alert('관리자 권한이 필요합니다.');
             if (confirm('이 게시글을 삭제하시겠습니까?')) {
-                posts.splice(pIndex, 1);
-                savePosts();
-                renderPosts();
+                await deleteDoc(doc(window.db, "posts", posts[pIndex].id));
             }
         };
 
         window.editPost = (pIndex) => {
             if (!isAdmin) return alert('관리자 권한이 필요합니다.');
             
-            currentEditIndex = pIndex;
             const post = posts[pIndex];
+            currentEditId = post.id;
 
             document.getElementById('boardName').value = post.author || "";
             document.getElementById('boardEmail').value = post.email || "";
             document.getElementById('boardTitle').value = post.title || "";
             document.getElementById('boardMessage').value = post.content || "";
             
-            const boardSecret = document.getElementById('boardSecret');
-            const boardSecretPw = document.getElementById('boardSecretPw');
             if (boardSecret) {
                 boardSecret.checked = post.isSecret || false;
                 if (boardSecretPw) {
@@ -184,12 +187,15 @@ document.addEventListener('DOMContentLoaded', () => {
             boardForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
         };
 
-        window.deleteReply = (pIndex, rIndex) => {
+        window.deleteReply = async (pIndex, rIndex) => {
             if (!isAdmin) return alert('관리자 권한이 필요합니다.');
             if (confirm('이 답글을 삭제하시겠습니까?')) {
-                posts[pIndex].replies.splice(rIndex, 1);
-                savePosts();
-                renderPosts();
+                const post = posts[pIndex];
+                const newReplies = [...post.replies];
+                newReplies.splice(rIndex, 1);
+                await updateDoc(doc(window.db, "posts", post.id), {
+                    replies: newReplies
+                });
             }
         };
 
@@ -227,7 +233,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
                  const isLocked = post.isSecret && !isAdmin;
                  const titleText = isLocked ? '비밀글입니다.' : (post.title || "제목 없음");
-                 const dateOnly = post.date.includes('오') ? post.date.split('오')[0].trim() : post.date.split(' ')[0];
+                 
+                 // 날짜 처리 (Firestore Timestamp 대응)
+                 let dateDisplay = "방금 전";
+                 if (post.createdAt) {
+                     const d = post.createdAt.toDate ? post.createdAt.toDate() : new Date(post.createdAt);
+                     dateDisplay = `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
+                 }
+
                  const postNum = posts.length - postIndex;
                  const viewsCount = post.views || 0;
                  const likesCount = post.likes || 0;
@@ -240,7 +253,7 @@ document.addEventListener('DOMContentLoaded', () => {
                               <span id="postTitle-${postIndex}" style="font-weight: 500; font-size: 1rem; color: #111; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${titleText}</span>
                           </div>
                           <div style="width: 100px; flex-shrink: 0; text-align: center; color: #555; font-size: 0.95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${post.author}</div>
-                          <div style="width: 100px; flex-shrink: 0; text-align: center; color: #888; font-size: 0.95rem;">${dateOnly}</div>
+                          <div style="width: 100px; flex-shrink: 0; text-align: center; color: #888; font-size: 0.95rem;">${dateDisplay}</div>
                           <div id="postViews-${postIndex}" style="width: 70px; flex-shrink: 0; text-align: center; color: #888; font-size: 0.95rem;">${viewsCount}</div>
                           <div id="postLikes-${postIndex}" style="width: 70px; flex-shrink: 0; text-align: center; color: #888; font-size: 0.95rem;">${likesCount}</div>
                       </div>
@@ -274,7 +287,7 @@ document.addEventListener('DOMContentLoaded', () => {
                           </div>
                       </div>
                  `;
-                 boardList.prepend(postEl);
+                 boardList.appendChild(postEl);
              });
         };
 
@@ -283,7 +296,7 @@ document.addEventListener('DOMContentLoaded', () => {
             form.classList.toggle('active');
         };
 
-        window.submitReply = (index) => {
+        window.submitReply = async (index) => {
             const nameInput = document.getElementById(`replyName-${index}`);
             const contentInput = document.getElementById(`replyContent-${index}`);
             
@@ -292,21 +305,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            if (!posts[index].replies) {
-                posts[index].replies = [];
-            }
-
-            posts[index].replies.push({
+            const post = posts[index];
+            const newReplies = post.replies ? [...post.replies] : [];
+            newReplies.push({
                 author: nameInput.value,
                 content: contentInput.value,
                 date: new Date().toLocaleString('ko-KR')
             });
 
-            savePosts();
-            renderPosts();
+            await updateDoc(doc(window.db, "posts", post.id), {
+                replies: newReplies
+            });
         };
 
-        boardForm.addEventListener('submit', (e) => {
+        boardForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const name = document.getElementById('boardName').value;
             const email = document.getElementById('boardEmail').value;
@@ -320,21 +332,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            if (currentEditIndex >= 0) {
-                posts[currentEditIndex].author = name;
-                posts[currentEditIndex].email = email;
-                posts[currentEditIndex].title = title;
-                posts[currentEditIndex].content = content;
-                posts[currentEditIndex].isSecret = isSecret;
-                posts[currentEditIndex].secretPw = secretPw;
-                alert('게시글이 수정되었습니다.');
-            } else {
-                posts.push({
+            if (currentEditId) {
+                // 수정 모드
+                await updateDoc(doc(window.db, "posts", currentEditId), {
                     author: name,
                     email: email,
                     title: title,
                     content: content,
-                    date: new Date().toLocaleString('ko-KR'),
+                    isSecret: isSecret,
+                    secretPw: secretPw
+                });
+                alert('게시글이 수정되었습니다.');
+            } else {
+                // 신규 등록
+                await addDoc(postsCol, {
+                    author: name,
+                    email: email,
+                    title: title,
+                    content: content,
+                    createdAt: serverTimestamp(),
                     isSecret: isSecret,
                     secretPw: secretPw,
                     replies: [],
@@ -342,11 +358,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     likes: 0
                 });
             }
-
-            savePosts();
-            renderPosts();
             
-            currentEditIndex = -1;
+            currentEditId = null;
             if (boardSubmitBtn) boardSubmitBtn.innerText = "게시글 등록하기";
             boardForm.reset();
             const pwField = document.getElementById('boardSecretPw');
@@ -355,8 +368,6 @@ document.addEventListener('DOMContentLoaded', () => {
             boardForm.style.display = 'none';
             if (showFormBtn) showFormBtn.style.display = 'inline-block';
         });
-
-        renderPosts();
     }
 
     // --- AI Chatbot Logic ---

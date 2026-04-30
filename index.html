@@ -588,7 +588,27 @@
         </p>
     </footer>
 
-    <script src="main.js"></script>
+    <!-- Firebase SDK -->
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.10.0/firebase-app.js";
+      import { getFirestore } from "https://www.gstatic.com/firebasejs/10.10.0/firebase-firestore.js";
+
+      const firebaseConfig = {
+        apiKey: "AIzaSyARTtUPWdtVqN1aJPn6WZ_GrjjnlPeTsF8",
+        authDomain: "my-portfolio-fef1b.firebaseapp.com",
+        projectId: "my-portfolio-fef1b",
+        storageBucket: "my-portfolio-fef1b.firebasestorage.app",
+        messagingSenderId: "176964600913",
+        appId: "1:176964600913:web:af0a891599c04dfc312470",
+        measurementId: "G-F1ZKMM059L"
+      };
+
+      const app = initializeApp(firebaseConfig);
+      window.db = getFirestore(app); // 전역 변수 db로 설정하여 main.js에서 접근 가능하게 함
+      console.log("Firebase & Firestore 초기화 완료");
+    </script>
+
+    <script type="module" src="main.js"></script>
 
     <!-- Admin Login Button -->
     <button id="adminBtn" style="position: fixed; right: 15px; bottom: 15px; background: transparent; border: none; cursor: pointer; outline: none; z-index: 9999;">
