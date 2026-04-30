@@ -122,12 +122,12 @@ header {
 
 /* Sections */
 section {
-    padding: 80px 10%; 
-    min-height: 100vh; /* 각 섹션이 화면 하나를 꽉 채우도록 설정 */
+    padding: 100px 10% 60px; /* 고정 헤더를 고려하여 상단 여백은 확보하고 하단은 줄임 */
+    min-height: 100vh;
     display: flex;
     flex-direction: column;
-    justify-content: center; /* 내용 중앙 정렬 */
-    scroll-margin-top: 80px;
+    justify-content: flex-start; /* 중앙 대신 위쪽부터 배치 */
+    scroll-margin-top: 0; /* padding으로 이미 오프셋을 줬으므로 0으로 조정 */
 }
 
 /* Alternate Background Colors for better readability */
